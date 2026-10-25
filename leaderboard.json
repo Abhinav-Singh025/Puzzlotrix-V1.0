@@ -1,0 +1,21 @@
+[
+  {
+    "id": 1790772153787,
+    "username": "TestPlayer",
+    "puzzle_type": "sudoku",
+    "grid_size": 4,
+    "time_ms": 15000,
+    "moves": 5,
+    "seed": 12345,
+    "created_at": "2026-09-30T12:42:33.787Z"
+  },
+  {
+    "id": 1790772395668,
+    "username": "Player 1",
+    "puzzle_type": "sliding-puzzle",
+    "grid_size": 3,
+    "time_ms": 8420,
+    "moves": 12,
+    "created_at": "2026-09-30T12:46:35.668Z"
+  }
+]
