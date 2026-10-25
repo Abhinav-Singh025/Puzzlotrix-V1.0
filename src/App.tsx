@@ -819,24 +819,55 @@ export default function App() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent | React.KeyboardEvent) => {
     if (!puzzle || !selectedCell || isSolving || puzzle.isSolved || isPaused) return;
-    setHasStarted(true);
+
+    const key = e.key;
 
     if (['sudoku', 'kenken', 'math-latin-square'].includes(puzzle.type)) {
-      const key = e.key;
+      // Arrow navigation across grid cells
+      const maxR = (puzzle.rows || puzzle.size) - 1;
+      const maxC = (puzzle.cols || puzzle.size) - 1;
+      if (key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCell(prev => prev ? { r: Math.max(0, prev.r - 1), c: prev.c } : null);
+        return;
+      }
+      if (key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCell(prev => prev ? { r: Math.min(maxR, prev.r + 1), c: prev.c } : null);
+        return;
+      }
+      if (key === 'ArrowLeft') {
+        e.preventDefault();
+        setSelectedCell(prev => prev ? { r: prev.r, c: Math.max(0, prev.c - 1) } : null);
+        return;
+      }
+      if (key === 'ArrowRight') {
+        e.preventDefault();
+        setSelectedCell(prev => prev ? { r: prev.r, c: Math.min(maxC, prev.c + 1) } : null);
+        return;
+      }
+
       const isSimpleGrid = puzzle.type === 'sudoku';
       const currentGrid = isSimpleGrid ? puzzle.data : puzzle.data.grid;
-      
-      if (key === 'Backspace' || key === 'Delete') {
+      if (!currentGrid || !currentGrid[selectedCell.r]) return;
+
+      // In Sudoku, prevent modifying immutable starter clues
+      const isClue = isSimpleGrid && puzzle.initialData && puzzle.initialData[selectedCell.r]?.[selectedCell.c] !== 0;
+      if (isClue) return;
+
+      if (key === 'Backspace' || key === 'Delete' || key === '0') {
         const currentVal = currentGrid[selectedCell.r][selectedCell.c];
         if (currentVal !== 0) {
+          setHasStarted(true);
           const newGrid = currentGrid.map((row: any) => [...row]);
           newGrid[selectedCell.r][selectedCell.c] = 0;
-          setPuzzle({
-            ...puzzle,
-            data: isSimpleGrid ? newGrid : { ...puzzle.data, grid: newGrid }
-          });
+          setPuzzle(prev => prev ? {
+            ...prev,
+            data: isSimpleGrid ? newGrid : { ...prev.data, grid: newGrid },
+            moves: (prev.moves || 0) + 1
+          } : null);
           logAction({
             actionType: 'clear',
             category: 'player',
@@ -848,20 +879,29 @@ export default function App() {
             status: 'valid'
           });
         }
-      } else if (/^[0-9]$/.test(key)) {
-        const num = parseInt(key);
+      } else if (/^[1-9]$/.test(key)) {
+        const num = parseInt(key, 10);
         const currentVal = currentGrid[selectedCell.r][selectedCell.c];
         
-        // Allow up to 6 digits (999,999) as requested
-        const combinedStr = currentVal === 0 ? `${num}` : `${currentVal}${num}`;
-        if (combinedStr.length <= 6) {
-          const newVal = parseInt(combinedStr);
+        let newVal = num;
+        // In Sudoku, KenKen, and Latin Square:
+        // Pressing a number key directly sets the cell to that digit (e.g. typing 4 sets to 4, never 44)
+        // Only for large grids (> 9, such as 16x16 Sudoku), allow entering two digits up to the puzzle size
+        if (puzzle.size > 9 && currentVal > 0 && currentVal * 10 + num <= puzzle.size) {
+          newVal = currentVal * 10 + num;
+        } else {
+          newVal = num <= puzzle.size ? num : num;
+        }
+
+        if (newVal <= puzzle.size) {
+          setHasStarted(true);
           const newGrid = currentGrid.map((row: any) => [...row]);
           newGrid[selectedCell.r][selectedCell.c] = newVal;
-          setPuzzle({
-            ...puzzle,
-            data: isSimpleGrid ? newGrid : { ...puzzle.data, grid: newGrid }
-          });
+          setPuzzle(prev => prev ? {
+            ...prev,
+            data: isSimpleGrid ? newGrid : { ...prev.data, grid: newGrid },
+            moves: (prev.moves || 0) + 1
+          } : null);
           logAction({
             actionType: 'input',
             category: 'player',
@@ -875,7 +915,7 @@ export default function App() {
         }
       }
     }
-  };
+  }, [puzzle, selectedCell, isSolving, isPaused, logAction]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -883,7 +923,7 @@ export default function App() {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
-      handleKeyDown(e as unknown as React.KeyboardEvent);
+      handleKeyDown(e);
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -1354,7 +1394,7 @@ export default function App() {
                     onCellClick={handleCellClick}
                     selectedCell={selectedCell}
                     validation={validation}
-                    onKeyDown={handleKeyDown}
+                    initialData={puzzle.initialData}
                   />
                 )}
               </div>

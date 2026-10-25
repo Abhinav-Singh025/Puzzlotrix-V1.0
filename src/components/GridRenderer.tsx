@@ -10,6 +10,7 @@ interface GridRendererProps {
   rows?: number;
   cols?: number;
   data: any;
+  initialData?: any;
   solution?: any;
   isSolved: boolean;
   onCellClick?: (r: number, c: number, e?: React.MouseEvent) => void;
@@ -19,7 +20,7 @@ interface GridRendererProps {
 }
 
 export const GridRenderer: React.FC<GridRendererProps> = ({
-  type, size, rows, cols, data, solution, isSolved, onCellClick, selectedCell, validation, onKeyDown
+  type, size, rows, cols, data, initialData, solution, isSolved, onCellClick, selectedCell, validation
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -162,7 +163,7 @@ export const GridRenderer: React.FC<GridRendererProps> = ({
       <div className={containerClasses}>
         {renderMaximizeButton()}
         <div className={`grid-container bg-[#2A2A2A] rounded-2xl border border-white/10 p-4 ${isMaximized ? 'max-w-full max-h-full' : ''}`}>
-          {renderMathLatinSquare(size, data, solution, isSolved, onCellClick, selectedCell, validation, onKeyDown)}
+          {renderMathLatinSquare(size, data, solution, isSolved, onCellClick, selectedCell, validation)}
         </div>
       </div>
     );
@@ -190,7 +191,6 @@ export const GridRenderer: React.FC<GridRendererProps> = ({
           dragElastic={0.05}
           className={`grid bg-[#1E1E1E] p-2 rounded-xl border border-white/10 shadow-inner outline-none focus:ring-2 focus:ring-[#FF7A00]/50 ${size > 10 ? 'cursor-grab active:cursor-grabbing' : ''}`}
           tabIndex={0}
-          onKeyDown={onKeyDown}
           style={{
             gridTemplateColumns: `repeat(${actualCols}, 1fr)`,
             gridTemplateRows: `repeat(${actualRows}, 1fr)`,
@@ -199,7 +199,7 @@ export const GridRenderer: React.FC<GridRendererProps> = ({
             aspectRatio: `${actualCols}/${actualRows}`
           }}
         >
-          {renderDOMGrid(type, size, actualRows, actualCols, data, solution, isSolved, isDragging, setIsDragging, dragFillType, setDragFillType, onCellClick, selectedCell, validation)}
+          {renderDOMGrid(type, size, actualRows, actualCols, data, solution, isSolved, isDragging, setIsDragging, dragFillType, setDragFillType, onCellClick, selectedCell, validation, initialData)}
         </motion.div>
       </div>
     </div>
@@ -213,8 +213,7 @@ const renderMathLatinSquare = (
   isSolved: boolean, 
   onCellClick?: (r: number, c: number, e?: React.MouseEvent) => void, 
   selectedCell?: { r: number; c: number } | null, 
-  validation?: ValidationResult,
-  onKeyDown?: (e: React.KeyboardEvent) => void
+  validation?: ValidationResult
 ) => {
   const grid = isSolved ? solution : data.grid;
   const conflicts = validation?.conflicts || [];
@@ -303,7 +302,6 @@ const renderMathLatinSquare = (
          dragElastic={0.1}
          className={`grid items-center justify-center outline-none focus:ring-2 focus:ring-[#FF7A00]/50 ${size > 6 ? 'cursor-grab active:cursor-grabbing' : ''}`}
          tabIndex={0}
-         onKeyDown={onKeyDown}
          style={{
            gridTemplateColumns: `repeat(${size - 1}, auto auto) auto auto`,
            gridTemplateRows: `repeat(${size - 1}, auto auto) auto auto`,
@@ -444,7 +442,8 @@ const renderDOMGrid = (
   setDragFillType: (t: number | null) => void,
   onCellClick?: (r: number, c: number, e?: React.MouseEvent) => void,
   selectedCell?: { r: number; c: number } | null,
-  validation?: ValidationResult
+  validation?: ValidationResult,
+  initialData?: any
 ) => {
   const cells = [];
   let displayData = data;
@@ -482,8 +481,15 @@ const renderDOMGrid = (
 
       if (type === 'sudoku') {
         const val = Array.isArray(displayData) ? displayData[r]?.[c] : displayData?.grid?.[r]?.[c];
+        const isClue = initialData && Array.isArray(initialData) && initialData[r]?.[c] !== 0;
         content = val !== 0 ? val : '';
-        if (val === 0 && !isSelected && !isConflict) cellClass += " bg-white/5";
+        if (isClue) {
+          cellClass += " font-black text-white/95 bg-white/10 cursor-default";
+        } else if (val !== 0) {
+          cellClass += " font-bold text-[#FF7A00] cursor-pointer hover:bg-white/5";
+        } else if (!isSelected && !isConflict) {
+          cellClass += " bg-white/5 cursor-pointer hover:bg-white/10";
+        }
         
         const n = Math.sqrt(size);
         if (Number.isInteger(n)) {
